@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Titanic Passenger Performance Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #F4EEDA; --teal: #5B8C78; --teal-dark: #3E6456; --teal-deep: #2F4D42;
+    --card: #FFFFFF; --ink: #243029; --sub: #5F6F67; --line: #E3DCC2; --rose:#B5543A; --tan:#D8CBA0;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --cream:#11160F; --card:#1A2119; --ink:#EDEFE9; --sub:#9FAC9F; --line:#2B332A; }
+  }
+  :root[data-theme="dark"] { --cream:#11160F; --card:#1A2119; --ink:#EDEFE9; --sub:#9FAC9F; --line:#2B332A; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--cream); color:var(--ink); font-family:'IBM Plex Sans',system-ui,sans-serif; }
+
+  .titlebar { background: var(--cream); border-bottom: 3px solid var(--teal); padding: 18px 24px; padding-top: calc(18px + env(safe-area-inset-top,0px)); text-align:center; }
+  .titlebar h1 { margin:0; color: var(--teal-dark); font-weight:700; letter-spacing:.03em; font-size: clamp(18px, 3.4vw, 26px); text-transform: uppercase; }
+  .titlebar .sub { color: var(--sub); font-size: 12.5px; margin-top: 4px; }
+
+  .page { display:flex; max-width:1280px; margin:0 auto; align-items:flex-start; }
+  .sidebar { width: 210px; flex-shrink:0; padding: 18px 14px; display:flex; flex-direction:column; gap:14px; }
+  .filt { background: var(--teal); border-radius: 10px; overflow:hidden; }
+  .filt .lbl { color:#fff; font-size:12.5px; font-weight:600; padding:9px 12px; }
+  .filt select { width:100%; border:none; padding:9px 12px; font-family:inherit; font-size:13px; background: var(--card); color: var(--ink); border-top: 1px solid rgba(255,255,255,.3); }
+  .reset { background: transparent; border: 1.5px solid var(--teal); color: var(--teal-dark); padding: 9px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit; font-weight:600; }
+  .reset:hover { background: var(--teal); color:#fff; }
+
+  .main { flex:1; padding: 18px 20px 40px 6px; min-width:0; }
+  .kpis { display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+  .kpi { background: var(--teal); color:#fff; border-radius: 10px; padding: 14px 18px; flex:1; min-width:120px; text-align:center; }
+  .kpi .value { font-size: 24px; font-weight:700; }
+  .kpi .label { font-size: 11px; opacity:.9; margin-top:3px; text-transform:uppercase; letter-spacing:.03em; }
+
+  .row { display:grid; gap:14px; margin-bottom:14px; }
+  .row.r1 { grid-template-columns: 1.4fr 1fr; }
+  .row.r2 { grid-template-columns: 1fr 1fr 1fr; }
+  .row.r3 { grid-template-columns: 1fr; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow:hidden; }
+  .card .hd { background: var(--teal); color:#fff; font-size:13px; font-weight:600; padding:9px 14px; text-align:center; }
+  .card .bd { padding: 10px; }
+  .chart-svg { width:100%; height:auto; display:block; color: var(--ink); }
+  .chart-svg text { font-family:'IBM Plex Sans',system-ui,sans-serif; }
+  .note { font-size: 10.5px; color: var(--sub); padding: 0 14px 10px; }
+
+  footer { text-align:center; color:var(--sub); font-size:11.5px; padding:6px 0 24px; }
+
+  @media (max-width: 860px) {
+    .page { flex-direction:column; }
+    .sidebar { width:100%; flex-direction:row; flex-wrap:wrap; }
+    .filt { flex:1; min-width:140px; }
+    .row.r1, .row.r2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="titlebar">
+  <h1>Titanic Passenger Performance Dashboard</h1>
+  <div class="sub">SWYNEX · Task 3 — built from the cleaned &amp; analyzed Titanic dataset</div>
+</div>
+
+<div class="page">
+  <div class="sidebar">
+    <div class="filt">
+      <div class="lbl">Passenger Class</div>
+      <select id="fClass"><option value="all">All</option><option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option></select>
+    </div>
+    <div class="filt">
+      <div class="lbl">Sex</div>
+      <select id="fSex"><option value="all">All</option><option value="M">Male</option><option value="F">Female</option></select>
+    </div>
+    <div class="filt">
+      <div class="lbl">Embarkation Port</div>
+      <select id="fEmbark"><option value="all">All</option><option value="S">Southampton</option><option value="C">Cherbourg</option><option value="Q">Queenstown</option></select>
+    </div>
+    <button class="reset" id="resetBtn">Reset filters</button>
+  </div>
+
+  <div class="main">
+    <div class="kpis">
+      <div class="kpi"><div class="value" id="kTotal">—</div><div class="label">Passengers</div></div>
+      <div class="kpi"><div class="value" id="kSurv">—</div><div class="label">Survival Rate</div></div>
+      <div class="kpi"><div class="value" id="kAge">—</div><div class="label">Avg Age</div></div>
+      <div class="kpi"><div class="value" id="kFare">—</div><div class="label">Avg Fare</div></div>
+      <div class="kpi"><div class="value" id="kFam">—</div><div class="label">Avg Family Size</div></div>
+    </div>
+
+    <div class="row r1">
+      <div class="card"><div class="hd">Survival Rate by Class &amp; Sex</div><div class="bd"><svg class="chart-svg" id="c1" viewBox="0 0 440 230"></svg></div></div>
+      <div class="card"><div class="hd">Survival Rate by Title</div><div class="bd"><svg class="chart-svg" id="c2" viewBox="0 0 320 230"></svg></div><div class="note" id="note2"></div></div>
+    </div>
+
+    <div class="row r2">
+      <div class="card"><div class="hd">Survival by Family Size</div><div class="bd"><svg class="chart-svg" id="c3" viewBox="0 0 300 230"></svg></div><div class="note" id="note3"></div></div>
+      <div class="card"><div class="hd">Survival Rate by Sex</div><div class="bd"><svg class="chart-svg" id="c4" viewBox="0 0 260 230"></svg></div></div>
+      <div class="card"><div class="hd">Avg Fare by Class</div><div class="bd"><svg class="chart-svg" id="c5" viewBox="0 0 260 230"></svg></div></div>
+    </div>
+
+    <div class="row r3">
+      <div class="card"><div class="hd">Age Distribution by Survival Outcome</div><div class="bd"><svg class="chart-svg" id="c6" viewBox="0 0 900 220"></svg></div></div>
+    </div>
+  </div>
+</div>
+<footer>Data: cleaned Titanic dataset, Task 1 &amp; Task 2 · Charts render as inline SVG (no external chart library, no network dependency)</footer>
+
+<script>
+const RAW = "3,M,0,22,7,2,r,S;1,F,1,38,71,2,s,C;3,F,1,26,8,1,i,S;1,F,1,35,53,2,s,S;3,M,0,35,8,1,r,S;3,M,0,25,8,1,r,Q;1,M,0,54,52,1,r,S;3,M,0,2,21,5,a,S;3,F,1,27,11,3,s,S;2,F,1,14,30,2,s,C;3,F,1,4,17,3,i,S;1,F,1,58,27,1,i,S;3,M,0,20,8,1,r,S;3,M,0,39,31,7,r,S;3,F,0,14,8,1,i,S;2,F,1,55,16,1,s,S;3,M,0,2,29,6,a,Q;2,M,1,30,13,1,r,S;3,F,0,31,18,2,s,S;3,F,1,22,7,1,s,C;2,M,0,35,26,1,r,S;2,M,1,34,13,1,r,S;3,F,1,15,8,1,i,Q;1,M,1,28,36,1,r,S;3,F,0,8,21,5,i,S;3,F,1,38,31,7,s,S;3,M,0,25,7,1,r,C;1,M,0,19,263,6,r,S;3,F,1,22,8,1,i,Q;3,M,0,25,8,1,r,S;1,M,0,40,28,1,x,C;1,F,1,35,147,2,s,C;3,F,1,22,8,1,i,Q;2,M,0,66,10,1,r,S;1,M,0,28,82,2,r,C;1,M,0,42,52,2,r,S;3,M,1,25,7,1,r,C;3,M,0,21,8,1,r,S;3,F,0,18,18,3,i,S;3,F,1,14,11,2,i,C;3,F,0,40,9,2,s,S;2,F,0,27,21,2,s,S;3,M,0,25,8,1,r,C;2,F,1,3,42,4,i,C;3,F,1,19,8,1,i,Q;3,M,0,25,8,1,r,S;3,M,0,25,16,2,r,Q;3,F,1,22,8,1,i,Q;3,M,0,25,22,3,r,C;3,F,0,18,18,2,s,S;3,M,0,7,40,6,a,S;3,M,0,21,8,1,r,S;1,F,1,49,77,2,s,C;2,F,1,29,26,2,s,S;1,M,0,65,62,2,r,C;1,M,1,40,36,1,r,S;2,F,1,21,10,1,i,S;3,M,0,28,7,1,r,C;2,F,1,5,28,4,i,S;3,M,0,11,47,8,a,S;3,M,0,22,7,1,r,C;1,F,1,38,80,1,i,S;1,M,0,45,83,2,r,S;3,M,0,4,28,6,a,S;1,M,0,40,28,1,r,C;3,M,1,25,15,3,a,C;2,F,1,29,10,1,s,S;3,M,0,19,8,1,r,S;3,F,1,17,8,7,i,S;3,M,0,26,9,3,r,S;2,M,0,32,10,1,r,S;3,F,0,16,47,8,i,S;2,M,0,21,74,1,r,S;3,M,0,26,14,2,r,C;3,M,1,32,56,1,r,S;3,M,0,25,8,1,r,S;3,M,0,25,8,1,r,S;3,M,0,25,8,1,r,S;2,M,1,1,29,3,a,S;3,F,1,30,12,1,i,S;3,M,0,22,9,1,r,S;3,M,1,29,10,1,r,S;3,F,1,22,8,1,i,Q;1,M,0,28,47,1,r,S;2,F,1,17,10,1,i,S;3,F,1,33,16,4,s,S;3,M,0,16,34,5,r,S;3,M,0,25,8,1,r,S;1,F,1,23,263,6,i,S;3,M,0,24,8,1,r,S;3,M,0,29,8,1,r,S;3,M,0,20,8,1,r,S;1,M,0,46,61,2,r,S;3,M,0,26,21,4,r,S;3,M,0,59,7,1,r,S;3,M,0,25,8,1,r,S;1,M,0,71,35,1,r,C;1,M,1,23,63,2,r,C;2,F,1,34,23,2,s,S;2,M,0,34,26,2,r,S;3,F,0,28,8,1,i,S;3,M,0,25,8,1,r,S;1,M,0,21,77,2,r,S;3,M,0,33,9,1,r,S;3,M,0,37,8,3,r,S;3,M,0,28,8,1,r,S;3,F,1,21,8,1,i,S;3,M,1,25,8,1,r,S;3,M,0,38,8,1,r,S;3,F,1,22,24,2,i,Q;1,M,0,47,52,1,r,S;3,F,0,14,14,2,i,C;3,M,0,22,8,1,r,S;3,F,0,20,10,2,i,S;3,F,0,17,14,1,i,C;3,M,0,21,8,1,r,S;3,M,0,70,8,1,r,Q;2,M,0,29,21,2,r,S;1,M,0,24,248,2,r,C;3,F,0,2,31,7,i,S;2,M,0,21,74,3,r,S;3,M,0,25,8,1,r,S;2,M,0,32,30,2,r,C;2,F,1,32,13,1,i,S;1,M,0,54,77,2,r,S;3,M,1,12,11,2,a,C;3,M,0,25,8,1,r,Q;3,M,1,24,7,1,r,S;3,F,1,22,22,3,i,C;3,M,0,45,7,1,r,S;3,M,0,33,8,1,r,C;3,M,0,20,7,1,r,S;3,F,0,47,14,2,s,S;2,F,1,29,26,2,s,S;2,M,0,25,13,1,r,S;2,M,0,23,15,1,r,C;1,F,1,19,26,3,i,S;1,M,0,37,53,2,r,S;3,M,0,16,9,1,r,S;1,M,0,24,79,1,r,C;3,F,0,22,15,3,s,C;3,F,1,22,8,1,i,S;3,F,1,24,16,2,s,S;3,M,0,19,7,1,r,Q;2,M,0,18,12,1,r,S;2,M,0,19,37,3,r,S;3,M,1,27,8,1,r,S;3,F,0,9,34,5,i,S;2,M,0,36,26,3,r,S;2,M,0,42,13,1,x,S;2,M,0,51,13,1,x,S;1,F,1,22,67,2,s,S;3,M,0,56,8,1,r,S;3,M,0,40,14,3,r,S;3,M,0,25,7,1,r,S;1,M,0,51,61,2,r,C;3,F,1,16,8,1,i,Q;3,M,0,30,8,1,r,S;3,M,0,25,9,1,r,S;3,M,0,25,70,11,a,S;3,M,0,44,16,2,r,S;2,F,1,40,16,1,s,S;3,M,0,26,8,1,r,S;3,M,0,17,9,1,r,S;3,M,0,1,40,6,a,S;3,M,1,9,21,3,a,S;1,F,1,35,55,2,s,S;3,F,0,45,28,6,s,S;1,M,0,40,26,1,r,S;3,M,0,28,56,1,r,S;1,M,0,61,34,1,r,S;3,M,0,4,29,6,a,Q;3,F,1,1,11,3,i,S;3,M,0,21,8,1,r,S;1,M,0,56,31,1,r,C;3,M,0,18,8,3,r,S;3,M,0,25,25,5,a,S;1,F,0,50,29,1,i,C;2,M,0,30,13,1,r,S;3,M,0,36,0,1,r,S;3,F,0,22,70,11,i,S;2,M,0,30,15,1,r,C;3,M,0,9,31,7,a,S;2,M,1,1,39,4,a,S;3,F,1,4,22,3,i,S;1,M,0,40,50,1,r,S;3,F,1,22,16,2,s,Q;1,M,1,45,27,1,r,S;3,M,0,40,16,3,r,Q;3,M,0,36,8,1,r,S;2,F,1,32,13,1,s,S;2,M,0,19,13,1,r,S;3,F,1,19,8,2,i,S;2,M,1,3,26,3,a,S;1,F,1,44,28,1,s,C;1,F,1,58,147,1,i,C;3,M,0,25,8,1,r,Q;3,M,0,42,8,2,r,S;3,F,1,22,8,1,i,Q;2,F,0,24,13,1,i,S;3,M,0,28,10,1,r,S;3,M,0,25,70,11,r,S;3,M,0,34,6,1,r,S;3,M,0,46,7,1,r,C;3,M,1,18,8,1,r,S;3,F,0,2,10,2,i,S;3,M,0,32,16,2,r,S;3,M,1,26,19,1,r,C;3,F,1,16,8,1,i,Q;1,M,1,40,31,1,r,C;3,M,0,24,7,1,r,S;2,F,1,35,21,1,i,S;3,M,0,22,7,1,r,S;2,M,0,30,13,1,r,S;3,M,0,25,8,2,r,Q;1,F,1,31,113,2,i,C;3,F,1,27,8,1,i,S;2,M,0,42,27,2,r,S;1,F,1,32,76,1,i,C;2,M,0,30,10,1,r,S;3,M,1,16,8,1,r,S;2,M,0,27,13,1,r,S;3,M,0,51,8,1,r,S;3,M,0,25,8,1,r,S;1,M,1,38,90,2,r,S;3,M,0,22,9,1,r,S;2,M,1,19,10,1,r,S;3,M,0,20,7,1,r,S;2,M,0,18,13,1,r,S;3,F,0,22,25,5,i,S;1,F,1,35,83,2,s,S;3,M,0,29,8,1,r,S;2,M,0,59,14,1,r,S;3,F,1,5,31,7,i,S;2,M,0,24,10,1,r,S;3,F,0,22,8,1,i,S;2,M,0,44,26,2,r,S;2,F,1,8,26,3,i,S;2,M,0,19,10,1,r,S;2,M,0,33,12,1,r,S;3,F,0,22,14,2,i,C;3,F,1,22,16,2,i,Q;2,M,0,29,10,1,r,S;3,M,0,22,7,1,r,S;3,M,0,30,7,1,r,C;1,M,0,44,90,3,x,Q;3,F,0,25,8,1,i,S;2,F,1,24,14,3,s,S;1,M,1,37,53,3,r,S;2,M,0,54,26,2,x,S;3,M,0,25,7,1,r,S;3,F,0,29,10,3,s,S;1,M,0,62,27,1,r,S;3,M,0,30,16,2,r,S;3,F,0,41,20,3,s,S;3,F,1,29,15,3,s,C;1,F,1,35,79,1,s,C;1,F,1,30,86,1,i,S;1,F,1,35,512,1,i,C;2,F,1,50,26,2,s,S;3,M,0,25,8,1,r,Q;3,M,1,3,31,7,a,S;1,M,0,52,80,3,r,S;1,M,0,40,0,1,r,S;3,F,0,22,8,1,i,Q;2,M,0,36,10,1,r,S;3,M,0,16,40,6,r,S;3,M,1,25,8,2,r,S;1,F,1,58,153,2,s,S;1,F,1,35,136,1,i,S;1,M,0,40,31,1,r,S;3,M,1,25,0,1,r,S;2,F,1,41,20,2,s,S;1,M,0,37,30,2,r,C;3,F,1,22,8,1,i,Q;1,F,1,63,78,2,i,S;3,F,0,45,8,1,i,S;2,M,0,30,0,1,r,S;3,M,0,7,29,6,a,Q;3,F,1,35,20,3,s,S;3,M,0,65,8,1,r,Q;3,M,0,28,8,1,r,S;3,M,0,16,10,1,r,S;3,M,1,19,8,1,r,S;1,M,0,40,26,1,r,S;3,M,0,33,9,1,r,C;3,M,1,30,10,1,r,S;3,M,0,22,8,1,r,S;2,M,1,42,13,1,r,S;3,F,1,22,8,1,i,Q;1,F,1,26,79,1,i,S;1,F,1,19,91,2,s,C;2,M,0,36,13,1,r,C;3,F,0,24,9,1,i,S;3,M,0,24,8,1,r,S;1,M,0,40,28,1,r,C;3,M,0,24,7,1,r,C;1,F,0,2,152,4,i,S;1,M,1,40,30,1,r,S;1,F,1,50,248,2,s,C;3,F,1,22,8,1,i,Q;3,M,1,25,23,3,r,Q;3,M,0,19,0,1,r,S;2,F,1,28,12,1,i,Q;3,M,0,25,8,1,r,S;1,M,1,1,152,4,a,S;1,F,1,35,111,1,i,C;1,F,1,17,109,2,s,C;2,M,0,30,24,2,r,C;1,F,1,30,57,1,i,C;1,F,1,24,83,1,i,C;1,F,1,18,262,5,i,C;2,F,0,26,26,3,s,S;3,M,0,28,8,1,r,S;2,M,0,43,26,3,r,S;3,F,1,26,8,1,i,S;2,F,1,24,26,2,s,S;2,M,0,54,14,1,x,S;1,F,1,31,165,3,i,S;1,F,1,40,134,3,s,C;3,M,0,22,7,1,r,S;3,M,0,27,8,1,r,S;2,F,1,30,12,1,i,Q;2,F,1,22,29,3,s,S;3,M,0,25,70,11,r,S;1,F,1,36,136,1,i,C;3,M,0,61,6,1,r,S;2,F,1,36,13,1,s,S;3,F,1,31,21,3,s,S;1,F,1,16,58,2,i,C;3,F,1,22,23,3,i,Q;1,M,0,46,28,1,r,S;1,M,0,38,153,2,r,S;3,M,0,16,18,3,r,S;1,F,1,35,134,2,s,S;3,M,0,25,8,1,r,S;1,M,0,29,67,2,r,S;1,F,1,41,134,1,i,C;3,M,1,45,8,1,r,S;1,M,0,45,36,1,r,S;2,M,1,2,26,3,a,S;1,F,1,24,263,6,i,S;2,M,0,28,13,1,r,S;2,M,0,25,13,1,r,S;2,M,0,36,13,1,r,S;2,F,1,24,13,1,i,S;2,F,1,40,13,1,i,S;3,F,1,22,16,2,s,S;3,M,1,3,16,3,a,S;3,M,0,42,9,1,r,S;3,M,0,23,9,1,r,S;1,M,0,40,35,1,r,S;3,M,0,15,7,3,r,C;3,M,0,25,18,2,r,S;3,M,0,25,7,1,r,C;3,M,0,28,10,1,r,S;1,F,1,22,55,2,i,S;2,F,0,38,13,1,i,S;3,F,1,22,8,1,i,Q;3,F,1,22,8,1,i,Q;3,M,0,40,28,6,r,S;2,M,0,29,28,2,r,C;3,F,0,45,14,2,s,C;3,M,0,35,7,1,r,S;3,M,0,25,16,2,r,Q;3,M,0,30,7,1,r,S;1,F,1,60,75,2,s,C;3,F,1,22,7,1,s,C;3,F,1,22,8,1,i,Q;1,F,1,24,69,1,s,C;1,M,1,25,55,2,r,C;3,M,0,18,6,2,r,S;3,M,0,19,8,1,r,S;1,M,0,22,136,1,r,C;3,F,0,3,21,5,i,S;1,F,1,35,82,2,s,C;3,F,1,22,7,1,i,S;1,M,0,27,212,3,r,C;3,M,0,20,4,1,r,C;3,M,0,19,8,1,r,S;1,F,1,42,228,1,i,C;3,F,1,1,16,3,i,C;3,M,0,32,8,1,r,S;1,F,1,35,52,2,s,S;3,M,0,25,8,1,r,S;2,M,0,18,74,1,r,S;3,M,0,1,47,8,a,S;2,F,1,36,13,1,i,S;3,M,0,25,8,1,r,Q;2,F,1,17,12,1,i,C;1,M,1,36,120,4,r,S;3,M,1,21,8,1,r,S;3,M,0,28,8,3,r,S;1,F,1,23,113,2,i,C;3,F,1,24,17,3,s,S;3,M,0,22,8,1,r,S;3,F,0,31,8,1,i,S;2,M,0,46,26,1,r,S;2,M,0,23,10,1,x,S;2,F,1,28,13,1,s,S;3,M,1,39,8,1,r,S;3,M,0,26,8,1,r,S;3,F,0,21,10,2,i,S;3,M,0,28,16,2,r,S;3,F,0,20,9,1,i,S;2,M,0,34,21,2,r,S;3,M,0,51,8,1,r,S;2,M,1,3,19,3,a,S;3,M,0,21,8,1,r,S;3,F,0,22,25,5,i,S;3,M,0,25,8,1,r,S;3,M,0,25,7,1,r,Q;1,F,1,33,90,2,i,Q;2,M,0,30,0,1,r,S;3,M,1,44,8,1,r,S;3,F,0,22,8,1,s,S;2,F,1,34,32,3,s,S;2,F,1,18,13,3,i,S;2,M,0,30,13,1,r,S;3,F,0,10,24,3,i,S;3,M,0,25,8,1,r,C;3,M,0,21,8,1,r,Q;3,M,0,29,8,1,r,S;3,F,0,28,14,3,s,S;3,M,0,18,20,3,r,S;3,M,0,25,7,1,r,S;2,F,1,28,26,2,s,S;2,F,1,19,26,1,i,S;3,M,0,25,8,1,r,Q;3,M,1,32,8,1,r,S;1,M,1,28,27,1,r,S;3,F,1,22,16,2,s,S;2,F,1,42,26,2,s,S;3,M,0,17,7,1,r,S;1,M,0,50,56,2,r,S;1,F,1,14,120,4,i,S;3,F,0,21,34,5,i,S;2,F,1,24,19,6,s,S;1,M,0,64,263,6,r,S;2,M,0,31,10,1,r,S;2,F,1,45,26,3,s,S;3,M,0,20,10,1,r,S;3,M,0,25,8,2,r,S;2,F,1,28,13,1,i,S;3,M,1,25,8,1,r,S;1,M,1,4,82,3,a,S;2,F,1,13,20,2,i,S;1,M,1,34,27,1,r,S;3,F,1,5,19,4,i,C;1,M,1,52,30,1,x,S;2,M,0,36,28,4,r,S;3,M,0,25,20,2,r,S;1,M,0,30,28,1,r,C;1,M,1,49,89,2,r,C;3,M,0,25,8,1,r,S;3,M,1,29,8,1,r,C;1,M,0,65,27,1,r,S;1,F,1,35,52,2,s,S;2,F,1,50,10,1,i,S;3,M,0,25,8,1,r,Q;1,M,1,48,27,1,r,S;3,M,0,34,8,1,r,S;1,M,0,47,38,1,r,S;2,M,0,48,13,1,r,S;3,M,0,25,8,1,r,S;3,M,0,38,7,1,r,S;2,M,0,30,0,1,r,S;1,M,0,56,27,1,r,S;3,M,0,25,8,1,r,Q;3,F,1,1,19,4,i,C;3,M,0,25,7,1,r,S;3,M,0,38,9,1,r,S;2,F,1,33,28,4,s,S;2,F,1,23,14,1,s,C;3,F,0,22,10,1,i,S;1,M,0,40,52,1,r,S;2,M,0,34,21,2,r,S;3,M,0,29,7,2,r,S;3,M,0,22,8,1,r,S;3,F,1,2,12,2,i,S;3,M,0,9,47,8,a,S;2,M,0,30,0,1,r,S;3,M,0,50,8,1,r,S;3,F,1,63,10,1,s,S;1,M,1,25,91,2,r,C;3,F,0,22,25,5,i,S;1,F,1,35,90,2,s,S;1,M,0,58,30,1,r,C;3,M,0,30,8,1,r,S;3,M,1,9,16,3,a,S;3,M,0,25,20,2,r,S;3,M,0,21,7,1,r,S;1,M,0,55,30,1,r,S;1,M,0,71,50,1,r,C;3,M,0,21,8,1,r,S;3,M,0,25,14,1,r,C;1,F,1,54,78,2,i,C;3,M,0,25,15,1,r,S;1,F,0,25,152,4,s,S;3,M,0,24,8,1,r,S;3,M,0,17,9,1,r,S;3,F,0,21,8,1,i,Q;3,F,0,22,8,1,i,Q;3,F,0,37,10,1,i,S;1,F,1,16,86,1,i,S;1,M,0,18,109,2,r,C;2,F,1,33,26,3,s,S;1,M,1,40,27,1,r,S;3,M,0,28,23,1,r,S;3,M,1,26,56,1,r,S;3,M,1,29,8,1,r,Q;3,M,0,25,8,1,r,S;1,M,1,36,26,1,r,S;1,F,1,54,59,2,s,C;3,M,0,24,7,1,r,S;1,M,0,47,34,1,r,S;2,F,1,34,10,1,s,S;3,M,0,25,24,1,r,Q;2,F,1,36,26,2,s,S;3,M,0,32,8,1,r,S;1,F,1,30,94,1,i,S;3,M,0,22,8,1,r,S;3,M,0,25,7,1,r,C;1,F,1,44,58,2,s,C;3,M,0,25,7,1,r,C;3,M,0,40,8,1,r,Q;2,F,1,50,10,1,i,S;1,M,0,40,222,1,r,S;3,M,0,39,8,1,r,S;2,M,0,23,12,4,r,S;2,F,1,2,26,3,i,S;3,M,0,25,7,1,r,C;3,M,0,17,7,3,r,C;3,F,1,22,22,3,s,C;3,F,0,30,9,1,i,S;2,F,1,7,26,3,i,S;1,M,0,45,27,1,x,S;1,F,1,30,106,1,i,C;3,M,0,25,14,1,r,S;1,F,1,22,50,3,i,C;1,F,1,36,71,3,i,S;3,F,0,9,31,7,i,S;3,F,0,11,31,7,i,S;2,M,1,32,26,2,r,S;1,M,0,50,106,2,r,C;1,M,0,64,26,1,r,S;2,F,1,19,26,2,s,S;2,M,1,30,14,1,r,C;3,M,0,33,21,3,r,S;2,M,1,8,37,3,a,S;1,M,1,17,111,3,r,C;2,M,0,27,26,1,r,S;3,M,0,25,8,1,r,Q;3,M,1,22,7,1,r,C;3,F,1,22,8,1,i,S;1,M,0,62,27,1,r,S;1,F,1,48,40,2,x,C;1,M,0,40,228,1,r,C;1,F,1,39,80,3,s,S;3,F,1,36,17,2,s,S;3,M,0,25,8,1,r,Q;3,M,0,40,8,1,r,S;2,M,0,28,14,1,r,S;3,M,0,25,8,1,r,S;3,F,0,22,8,1,i,S;3,M,0,24,24,3,r,S;3,M,0,19,8,1,r,S;3,F,0,29,21,5,s,S;3,M,0,25,7,1,r,C;3,M,1,32,8,1,r,S;2,M,1,62,10,1,r,S;1,F,1,53,51,3,s,S;1,M,1,36,26,1,r,S;3,F,1,22,8,1,i,Q;3,M,0,16,8,1,r,S;3,M,0,19,14,1,r,S;2,F,1,34,13,1,i,S;1,F,1,39,56,2,s,S;3,F,0,22,14,2,s,C;3,M,1,32,8,1,r,S;2,F,1,25,30,3,i,S;1,F,1,39,111,3,s,C;2,M,0,54,26,1,r,S;1,M,0,36,40,1,r,C;3,M,0,25,9,1,r,C;1,F,1,18,80,3,i,S;2,M,0,47,15,1,r,S;1,M,1,60,79,3,r,C;3,M,0,22,8,1,r,S;3,M,0,25,8,1,r,S;3,M,0,35,7,1,r,S;1,F,1,52,78,2,s,C;3,M,0,47,7,1,r,S;3,F,0,22,8,3,i,Q;2,M,0,37,26,2,r,S;3,M,0,36,24,3,r,S;2,F,1,28,33,1,i,S;3,M,0,49,0,1,r,S;3,M,0,25,7,1,r,C;1,M,1,49,57,2,x,C;2,F,1,24,27,4,s,S;3,M,0,25,8,1,r,S;1,M,0,40,42,1,r,S;3,M,0,44,8,1,r,S;1,M,1,35,27,1,r,C;3,M,0,36,16,2,r,S;3,M,0,30,8,1,r,S;1,M,1,27,30,1,r,S;2,F,1,22,42,4,s,C;1,F,1,40,153,1,i,S;3,F,0,39,31,7,s,S;3,M,0,25,7,1,r,S;3,F,1,22,16,2,i,Q;3,M,0,25,8,1,r,Q;3,M,0,35,8,1,r,S;2,F,1,24,65,4,i,S;3,M,0,34,14,3,r,S;3,F,0,26,16,2,s,S;2,F,1,4,39,4,i,S;2,M,0,26,10,1,r,S;3,M,0,27,14,2,r,C;1,M,1,42,53,2,r,S;3,M,1,20,16,3,r,C;3,M,0,21,8,1,r,S;3,M,0,21,16,1,r,S;1,M,0,61,32,1,r,S;2,M,0,57,12,1,x,Q;1,F,1,21,78,1,i,S;3,M,0,26,8,1,r,S;3,M,0,25,8,1,r,Q;1,M,1,80,30,1,r,S;3,M,0,51,7,1,r,S;1,M,1,32,30,1,x,C;1,M,0,40,0,1,r,S;3,F,0,9,28,6,i,S;2,F,1,28,13,1,i,S;3,M,0,32,8,1,r,S;2,M,0,31,26,3,r,S;3,F,0,41,40,6,s,S;3,M,0,25,16,2,r,S;3,M,0,20,8,1,r,S;1,F,1,24,69,1,i,C;3,F,0,2,28,6,i,S;3,M,1,25,56,1,r,S;3,F,1,1,19,4,i,C;1,M,1,48,77,2,r,C;3,M,0,19,8,1,r,S;1,M,1,56,36,1,x,C;3,M,0,25,8,1,r,S;3,F,1,23,8,1,i,S;3,M,0,25,8,1,r,S;2,F,1,18,23,2,i,S;3,M,0,21,8,1,r,S;3,F,1,22,8,1,i,Q;3,F,0,18,7,1,i,Q;2,M,0,24,74,3,r,S;3,M,0,25,8,1,r,S;3,F,0,32,16,3,s,Q;2,M,0,23,13,1,r,S;1,M,0,58,113,3,r,C;1,M,1,50,134,3,x,S;3,M,0,40,7,1,r,C;1,M,0,47,26,1,r,S;3,M,0,36,7,1,r,S;3,M,1,20,8,2,r,S;2,M,0,32,74,3,r,S;2,M,0,25,13,1,r,S;3,M,0,25,8,1,r,S;3,M,0,43,8,1,r,S;1,F,1,35,52,2,s,S;2,F,1,40,39,3,s,S;1,M,0,31,52,2,r,S;2,M,0,70,10,1,r,S;2,M,1,31,13,1,r,S;2,M,0,30,0,1,r,S;3,M,0,18,8,1,r,S;3,M,0,24,8,1,r,S;3,F,1,18,10,1,i,S;3,F,0,43,47,8,s,S;1,M,1,36,512,2,r,C;3,F,0,22,8,1,i,Q;1,M,1,27,77,1,r,C;3,M,0,20,9,1,r,S;3,M,0,14,47,8,r,S;2,M,0,60,39,3,r,S;2,M,0,25,42,4,r,C;3,M,0,14,40,6,r,S;3,M,0,19,10,1,r,S;3,M,0,18,8,1,r,S;1,F,1,15,211,2,i,S;1,M,1,31,57,2,r,S;3,F,1,4,13,2,i,C;3,M,1,25,56,1,r,S;3,M,0,25,7,1,r,C;1,M,0,60,27,1,x,S;2,M,0,52,14,1,r,S;3,M,0,44,8,1,r,S;3,F,1,22,8,1,i,Q;1,M,0,49,111,3,r,C;3,M,0,42,8,1,r,S;1,F,1,18,228,2,s,C;1,M,1,35,26,1,r,S;3,F,0,18,14,2,i,C;3,M,0,25,8,1,r,Q;3,M,0,26,8,2,r,S;2,M,0,39,26,1,r,S;2,F,1,45,14,1,s,S;1,M,1,42,26,1,r,S;1,F,1,22,152,1,i,S;3,M,1,25,15,3,a,C;1,F,1,24,50,1,i,C;1,M,0,40,27,1,r,S;1,M,1,48,52,2,r,S;3,M,0,29,9,1,r,S;2,M,0,52,13,1,r,S;3,M,0,19,8,1,r,S;1,F,1,38,228,1,i,C;2,F,1,27,10,1,i,S;3,M,0,25,16,1,r,Q;3,M,0,33,8,1,r,S;2,F,1,6,33,2,i,S;3,M,0,17,7,2,r,S;2,M,0,34,13,1,r,S;2,M,0,50,13,1,r,S;1,M,1,27,53,2,r,S;3,M,0,20,9,1,r,S;2,F,1,30,21,4,s,S;3,F,1,22,8,1,i,Q;2,M,0,25,26,2,r,S;3,F,0,25,8,2,i,S;1,F,1,29,211,1,i,S;3,M,0,11,19,1,r,C;2,M,0,30,0,1,r,S;2,M,0,23,13,1,r,S;2,M,0,23,13,1,r,S;3,M,0,28,16,1,r,S;3,F,0,48,34,5,s,S;1,M,1,35,512,1,r,C;3,M,0,25,8,1,r,S;3,M,0,25,8,1,r,S;1,M,1,40,30,1,r,S;1,M,0,36,79,2,r,S;1,F,1,21,262,5,i,C;3,M,0,24,16,2,r,S;3,M,1,31,8,1,r,S;1,M,0,70,71,3,x,S;3,M,0,16,20,3,r,S;2,F,1,30,13,1,i,S;1,M,0,19,53,2,r,S;3,M,0,31,8,1,r,Q;2,F,1,4,23,3,i,S;3,M,1,6,12,2,a,S;3,M,0,33,10,1,r,S;3,M,0,23,8,1,r,S;2,F,1,48,65,4,s,S;2,M,1,1,14,3,a,S;3,M,0,28,8,1,r,S;2,M,0,18,12,1,r,S;3,M,0,34,8,1,r,S;1,F,1,33,86,1,c,S;3,M,0,25,14,1,r,S;3,M,0,41,7,1,r,S;3,M,1,20,7,1,r,C;1,F,1,36,120,4,s,S;3,M,0,16,8,1,r,S;1,F,1,51,78,2,s,S;1,M,0,40,40,1,x,C;3,F,0,30,8,1,i,Q;3,M,0,25,24,2,r,Q;3,M,0,32,8,1,r,S;3,M,0,24,10,1,r,S;3,M,0,48,8,1,r,S;2,F,0,57,10,1,s,S;3,M,0,25,7,1,r,C;2,F,1,54,23,5,s,S;3,M,0,18,8,1,r,S;3,M,0,25,8,1,r,Q;3,F,1,5,12,1,i,S;3,M,0,25,8,1,r,Q;1,F,1,43,211,2,s,S;3,F,1,13,7,1,i,C;1,F,1,17,57,2,s,S;1,M,0,29,30,1,r,S;3,M,0,25,23,4,r,S;3,M,0,25,7,1,r,S;3,M,0,25,7,1,r,S;3,F,1,18,7,1,i,S;3,M,0,8,29,6,a,Q;3,M,1,1,21,4,a,S;1,M,0,46,79,1,r,C;3,M,0,25,8,1,r,Q;2,M,0,16,26,1,r,S;3,F,0,22,70,11,i,S;1,M,0,40,31,1,r,C;3,M,0,25,8,1,r,S;2,M,0,39,13,1,r,S;1,F,1,49,26,1,x,S;3,F,1,31,9,1,s,S;3,M,0,30,7,1,r,C;3,F,0,30,24,3,s,S;2,M,0,34,13,1,r,S;2,F,1,31,26,3,s,S;1,M,1,11,120,4,a,S;3,M,1,0,9,2,a,C;3,M,1,27,7,1,r,S;3,M,0,31,8,1,r,S;1,M,0,39,0,1,r,S;3,F,0,18,8,1,i,S;2,M,0,39,13,1,r,S;1,F,1,33,53,2,s,S;3,M,0,26,8,1,r,S;3,M,0,39,24,1,r,S;2,M,0,35,10,1,r,S;3,F,0,6,31,7,i,S;3,M,0,30,8,1,r,S;1,M,0,40,0,1,r,S;3,F,0,23,8,1,i,S;2,M,0,31,37,3,r,C;3,M,0,43,6,1,r,S;3,M,0,10,28,6,a,S;1,F,1,52,94,3,s,S;3,M,1,27,9,1,r,S;1,M,0,38,0,1,x,S;3,F,1,27,12,2,s,S;3,M,0,2,40,6,a,S;3,M,0,25,7,1,r,Q;3,M,0,25,56,1,r,S;2,M,1,1,37,3,a,C;3,M,1,25,8,1,r,Q;1,F,1,62,80,1,s,S;3,F,1,15,14,2,s,C;2,M,1,1,19,3,a,S;3,M,0,25,7,1,r,C;3,M,0,23,8,1,r,S;3,M,0,18,8,1,r,S;1,F,1,39,83,3,i,C;3,M,0,21,9,1,r,S;3,M,0,25,8,1,r,S;3,M,1,32,56,1,r,S;1,M,1,40,30,1,r,C;3,M,0,20,8,1,r,S;2,M,0,16,10,1,r,S;1,F,1,30,31,1,i,C;3,M,0,34,6,1,r,C;3,M,0,17,9,1,r,S;3,M,0,42,8,1,r,S;3,M,0,25,70,11,r,S;3,M,0,35,8,1,r,C;2,M,0,28,33,2,x,S;1,F,1,35,89,2,s,C;3,M,0,4,31,7,a,S;3,M,0,74,8,1,r,S;3,F,0,9,15,3,i,C;1,F,1,16,39,2,i,S;2,F,0,44,26,2,s,S;3,F,1,18,9,2,s,S;1,F,1,45,165,3,s,S;1,M,1,51,27,1,r,S;3,F,1,24,19,4,s,C;3,M,0,25,7,1,r,C;3,M,0,41,14,3,r,S;2,M,0,21,12,2,r,S;1,F,1,48,26,1,s,S;3,F,0,22,70,11,i,S;2,M,0,24,13,1,r,S;2,F,1,42,13,1,s,S;2,F,1,27,14,2,i,C;1,M,0,31,50,1,r,S;3,M,0,25,10,1,r,S;3,M,1,4,11,3,a,S;3,M,0,26,8,1,r,S;1,F,1,47,53,3,s,S;1,M,0,33,5,1,r,S;3,M,0,47,9,1,r,S;2,F,1,28,24,2,s,C;3,F,1,15,7,1,i,C;3,M,0,20,10,1,r,S;3,M,0,19,8,1,r,S;3,M,0,25,8,1,r,S;1,F,1,56,83,2,s,C;2,F,1,25,26,2,s,S;3,M,0,33,8,1,r,S;3,F,0,22,11,1,i,S;2,M,0,28,10,1,r,S;3,M,0,25,7,1,r,S;3,F,0,39,29,6,s,Q;2,M,0,27,13,1,x,S;1,F,1,19,30,1,i,S;3,F,0,22,23,4,i,S;1,M,1,26,30,1,r,C;3,M,0,32,8,1,r,Q";
+const titleFull = {r:'Mr', s:'Mrs', i:'Miss', a:'Master', x:'Rare', c:'Countess'};
+const data = RAW.split(';').map(row => {
+  const [pclass, sex, survived, age, fare, fam, title, embark] = row.split(',');
+  return { pclass:+pclass, sex, survived:+survived, age:+age, fare:+fare, fam:+fam, title, embark };
+});
+
+const SVGNS = 'http://www.w3.org/2000/svg';
+const COLORS = { teal:'#5B8C78', tealDark:'#3E6456', rose:'#B5543A', tan:'#D8CBA0' };
+
+function mean(a){ return a.length? a.reduce((x,y)=>x+y,0)/a.length : 0; }
+function survRate(rows){ return rows.length? mean(rows.map(r=>r.survived))*100 : 0; }
+function groupBy(rows, fn){ const m=new Map(); rows.forEach(r=>{const k=fn(r); if(!m.has(k)) m.set(k,[]); m.get(k).push(r);}); return m; }
+
+function el(tag, attrs){
+  const n = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  return n;
+}
+function clearSvg(svg){ while (svg.firstChild) svg.removeChild(svg.firstChild); }
+
+// Generic bar chart: vertical or horizontal, grouped or stacked
+function drawBarChart(svg, { labels, datasets, horizontal=false, stacked=false, fmt=(v)=>Math.round(v), maxVal, padLOverride }){
+  clearSvg(svg);
+  const vb = svg.viewBox.baseVal;
+  const W = vb.width, H = vb.height;
+  const padL = padLOverride || (horizontal ? 78 : 36), padR = horizontal ? 36 : 10, padT = 8, padB = horizontal ? 8 : 34;
+  const legendH = datasets.length > 1 ? 18 : 0;
+  const plotW = W - padL - padR, plotH = H - padT - padB - legendH;
+  const n = labels.length;
+
+  if (!maxVal) {
+    if (stacked) {
+      maxVal = Math.max(...labels.map((_, i) => datasets.reduce((s,d)=>s+d.data[i], 0))) * 1.12 || 1;
+    } else {
+      maxVal = Math.max(...datasets.flatMap(d => d.data)) * 1.18 || 1;
+    }
+  }
+
+  if (horizontal) {
+    const bandH = plotH / n;
+    const barH = Math.min(18, (bandH / datasets.length) * 0.68);
+    labels.forEach((lab, i) => {
+      svg.appendChild(el('text', { x: padL - 8, y: padT + i*bandH + bandH/2 + 4, 'text-anchor':'end', 'font-size':11, fill:'currentColor' })).textContent = lab;
+      datasets.forEach((ds, j) => {
+        const val = ds.data[i];
+        const bw = Math.max((val / maxVal) * plotW, 0);
+        const y = padT + i*bandH + j*(bandH/datasets.length) + (bandH/datasets.length - barH)/2;
+        svg.appendChild(el('rect', { x: padL, y, width: bw, height: barH, rx: 3, fill: ds.color }));
+        svg.appendChild(el('text', { x: padL + bw + 5, y: y + barH/2 + 4, 'font-size':10.5, fill:'currentColor' })).textContent = fmt(val);
+      });
+    });
+  } else {
+    const bandW = plotW / n;
+    const barW = stacked ? Math.min(44, bandW * 0.55) : Math.min(26, (bandW/datasets.length)*0.62);
+    labels.forEach((lab, i) => {
+      let yCursor = padT + plotH;
+      datasets.forEach((ds, j) => {
+        const val = ds.data[i];
+        const bh = Math.max((val / maxVal) * plotH, 0);
+        let x, y;
+        if (stacked) {
+          x = padL + i*bandW + (bandW - barW)/2;
+          y = yCursor - bh;
+          yCursor -= bh;
+        } else {
+          x = padL + i*bandW + j*(bandW/datasets.length) + (bandW/datasets.length - barW)/2;
+          y = padT + plotH - bh;
+        }
+        svg.appendChild(el('rect', { x, y, width: barW, height: bh, rx: 3, fill: ds.color }));
+        if (!stacked) {
+          svg.appendChild(el('text', { x: x + barW/2, y: y - 4, 'text-anchor':'middle', 'font-size':10.5, fill:'currentColor' })).textContent = fmt(val);
+        }
+      });
+      svg.appendChild(el('text', { x: padL + i*bandW + bandW/2, y: H - padB + 16 - legendH, 'text-anchor':'middle', 'font-size':10.5, fill:'currentColor' })).textContent = lab;
+    });
+  }
+
+  if (datasets.length > 1) {
+    datasets.forEach((ds, j) => {
+      const lx = padL + j*90, ly = H - 6;
+      svg.appendChild(el('rect', { x: lx, y: ly-9, width:10, height:10, rx:2, fill: ds.color }));
+      svg.appendChild(el('text', { x: lx+14, y: ly, 'font-size':10.5, fill:'currentColor' })).textContent = ds.label;
+    });
+  }
+}
+
+function getFiltered(){
+  const c=document.getElementById('fClass').value, s=document.getElementById('fSex').value, e=document.getElementById('fEmbark').value;
+  return data.filter(d=> (c==='all'||d.pclass==+c) && (s==='all'||d.sex===s) && (e==='all'||d.embark===e) );
+}
+
+function render(){
+  const rows = getFiltered();
+
+  document.getElementById('kTotal').textContent = rows.length;
+  document.getElementById('kSurv').textContent = rows.length? survRate(rows).toFixed(1)+'%':'—';
+  document.getElementById('kAge').textContent = rows.length? mean(rows.map(r=>r.age)).toFixed(1):'—';
+  document.getElementById('kFare').textContent = rows.length? '$'+mean(rows.map(r=>r.fare)).toFixed(0):'—';
+  document.getElementById('kFam').textContent = rows.length? mean(rows.map(r=>r.fam)).toFixed(1):'—';
+
+  if (!rows.length) {
+    ['c1','c2','c3','c4','c5','c6'].forEach(id => clearSvg(document.getElementById(id)));
+    document.getElementById('note2').textContent = '';
+    document.getElementById('note3').textContent = '';
+    return;
+  }
+
+  // Chart 1: Survival rate by class & sex (grouped vertical bars)
+  const classes = [1,2,3];
+  const femaleVals = classes.map(c => survRate(rows.filter(r=>r.pclass===c && r.sex==='F')));
+  const maleVals   = classes.map(c => survRate(rows.filter(r=>r.pclass===c && r.sex==='M')));
+  drawBarChart(document.getElementById('c1'), {
+    labels: ['1st','2nd','3rd'],
+    datasets: [
+      { label:'Female', data: femaleVals, color: COLORS.tealDark },
+      { label:'Male', data: maleVals, color: COLORS.tan }
+    ],
+    fmt: v => v.toFixed(0)+'%', maxVal: 110
+  });
+
+  // Chart 2: Survival rate by title (horizontal)
+  const titleGroups = groupBy(rows, r=>r.title);
+  const titleKeys = [...titleGroups.keys()].sort((a,b)=>survRate(titleGroups.get(b))-survRate(titleGroups.get(a)));
+  drawBarChart(document.getElementById('c2'), {
+    labels: titleKeys.map(k => `${titleFull[k]} (n=${titleGroups.get(k).length})`),
+    datasets: [{ label:'Survival %', data: titleKeys.map(k=>survRate(titleGroups.get(k))), color: COLORS.teal }],
+    horizontal: true, fmt: v => v.toFixed(0)+'%', maxVal: 115, padLOverride: 108
+  });
+  const small = titleKeys.filter(k => titleGroups.get(k).length < 5);
+  document.getElementById('note2').textContent = small.length
+    ? `Small sample caution: ${small.map(k=>`${titleFull[k]} (n=${titleGroups.get(k).length})`).join(', ')} — not statistically reliable.`
+    : '';
+
+  // Chart 3: Survival by family size (horizontal)
+  const famGroups = groupBy(rows, r=>r.fam);
+  const famKeys = [...famGroups.keys()].sort((a,b)=>a-b);
+  drawBarChart(document.getElementById('c3'), {
+    labels: famKeys.map(k => `Size ${k} (n=${famGroups.get(k).length})`),
+    datasets: [{ label:'Survival %', data: famKeys.map(k=>survRate(famGroups.get(k))), color: COLORS.teal }],
+    horizontal: true, fmt: v => v.toFixed(0)+'%', maxVal: 115
+  });
+  const smallFam = famKeys.filter(k => famGroups.get(k).length < 10);
+  document.getElementById('note3').textContent = smallFam.length
+    ? `Small sample caution: family sizes ${smallFam.join(', ')} have fewer than 10 passengers — interpret cautiously.`
+    : '';
+
+  // Chart 4: Survival rate by sex (vertical, 2 bars)
+  drawBarChart(document.getElementById('c4'), {
+    labels: ['Female','Male'],
+    datasets: [{ label:'Survival %', data: [survRate(rows.filter(r=>r.sex==='F')), survRate(rows.filter(r=>r.sex==='M'))], color: COLORS.teal }],
+    fmt: v => v.toFixed(1)+'%', maxVal: 110
+  });
+
+  // Chart 5: Average fare by class (vertical)
+  drawBarChart(document.getElementById('c5'), {
+    labels: ['1st','2nd','3rd'],
+    datasets: [{ label:'Avg Fare', data: classes.map(c => mean(rows.filter(r=>r.pclass===c).map(r=>r.fare))), color: COLORS.teal }],
+    fmt: v => '$'+v.toFixed(0)
+  });
+
+  // Chart 6: Age distribution by survival outcome (stacked)
+  const bins = [0,10,20,30,40,50,60,70,80,90];
+  const binLabels = bins.slice(0,-1).map((b,i)=>`${b}-${bins[i+1]-1}`);
+  const died = new Array(binLabels.length).fill(0);
+  const surv = new Array(binLabels.length).fill(0);
+  rows.forEach(r => {
+    const idx = Math.min(Math.floor(r.age/10), binLabels.length-1);
+    if (r.survived) surv[idx]++; else died[idx]++;
+  });
+  drawBarChart(document.getElementById('c6'), {
+    labels: binLabels,
+    datasets: [
+      { label:'Died', data: died, color: COLORS.rose },
+      { label:'Survived', data: surv, color: COLORS.teal }
+    ],
+    stacked: true, fmt: v => v
+  });
+}
+
+['fClass','fSex','fEmbark'].forEach(id => document.getElementById(id).addEventListener('change', render));
+document.getElementById('resetBtn').addEventListener('click', () => {
+  document.getElementById('fClass').value='all';
+  document.getElementById('fSex').value='all';
+  document.getElementById('fEmbark').value='all';
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
